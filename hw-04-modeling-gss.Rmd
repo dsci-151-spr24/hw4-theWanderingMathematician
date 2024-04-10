@@ -1,5 +1,7 @@
 ---
 title: "HW 04 - Modeling the GSS"
+author: "Micaiah Balonek"
+date: "10 April, 2024"
 output: html_document
 ---
 
