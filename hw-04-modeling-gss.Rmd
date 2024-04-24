@@ -198,7 +198,7 @@ collect_metrics(gss16_fit_rs_2)
     Explain your reasoning.
     Note: If you haven't yet done so, you'll need to first train your workflows on the training data with the following, and then use these fit objects to calculate predictions for the test data.
 
-```{r compare ROC_curves}
+```{r compare-ROC-curves}
 gss16_fit_1 <- gss16_wflow_1 %>%
   fit(gss16_train)
 
@@ -255,8 +255,41 @@ The question is phrased as the following.
 Answers to this question are stored in the `harass5` variable in our dataset.
 
 12. Create a subset of the data that only contains `Yes` and `No` answers for the harassment question. How many responses chose each of these answers?
+
+```{r create-harassYN}
+harassYN <- gss16 %>%
+  filter(harass5 %in% c("Yes", "No"))
+
+count(harassYN, harass5)
+```
+
+- *237 people responded 'Yes', while 1136 responded 'No'.*
+
 13. Describe how bootstrapping can be used to estimate the proportion of Americans who have been harassed by their superiors or co-workers at their job.
+
+- *We would take many samples with replacement from the data, and then calculate the proportion of 'Yes' to 'No' answers in each sample. We would then calculate a confidence interval based on the bounds of the distribution of proportions, which is our confidence interval for the final answer.*
+
 14. Calculate a 95% bootstrap confidence interval for the proportion of Americans who have been harassed by their superiors or co-workers at their job. Interpret this interval in context of the data.
 15. Would you expect a 90% confidence interval to be wider or narrower than the interval you calculated above? Explain your reasoning.
+
+```{r bootstrap-data}
+
+harass_boot_list <- c()
+i <- 1
+for(i in c(1:500)) {
+  tempVar <- harassYN %>%
+ slice_sample(n = 1373, replace = TRUE) %>%
+  count(harass5) %>%
+  mutate(n = n/sum(n)) %>%
+  slice_tail()
+
+  harass_boot_list <- c(harass_boot_list, tempVar$n)
+}
+
+t.test(harass_boot_list)$conf.int
+```
+
+- *The 95% confidence interval for this bootstrap data is between 0.1716 and 0.1734. This means that, with 95% certainty, between 17.16% and 17.34% of Americans have been harassed at work by their superiors or co-workers.*
+- *A 90% confidence interval would be a slightly smaller interval, but would therefore be slightly less likely (to be precise, 5% less likely) to include the actual value.*
 
 🧶 ✅ ⬆️ Knit, *commit, and push your changes to GitHub with an appropriate commit message. Make sure to commit and push all changed files so that your Git pane is cleared up afterwards and review the md document on GitHub to make sure you're happy with the final state of your work.*

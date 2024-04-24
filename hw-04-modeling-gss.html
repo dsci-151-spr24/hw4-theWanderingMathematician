@@ -659,15 +659,55 @@ variable in our dataset.</p>
 <li>Create a subset of the data that only contains <code>Yes</code> and
 <code>No</code> answers for the harassment question. How many responses
 chose each of these answers?</li>
+</ol>
+<pre class="r"><code>harassYN &lt;- gss16 %&gt;%
+  filter(harass5 %in% c(&quot;Yes&quot;, &quot;No&quot;))
+
+count(harassYN, harass5)</code></pre>
+<ul>
+<li><em>237 people responded ‘Yes’, while 1136 responded ‘No’.</em></li>
+</ul>
+<ol start="13" style="list-style-type: decimal">
 <li>Describe how bootstrapping can be used to estimate the proportion of
 Americans who have been harassed by their superiors or co-workers at
 their job.</li>
+</ol>
+<ul>
+<li><em>We would take many samples with replacement from the data, and
+then calculate the proportion of ‘Yes’ to ‘No’ answers in each sample.
+We would then calculate a confidence interval based on the bounds of the
+distribution of proportions, which is our confidence interval for the
+final answer.</em></li>
+</ul>
+<ol start="14" style="list-style-type: decimal">
 <li>Calculate a 95% bootstrap confidence interval for the proportion of
 Americans who have been harassed by their superiors or co-workers at
 their job. Interpret this interval in context of the data.</li>
 <li>Would you expect a 90% confidence interval to be wider or narrower
 than the interval you calculated above? Explain your reasoning.</li>
 </ol>
+<pre class="r"><code>harass_boot_list &lt;- c()
+i &lt;- 1
+for(i in c(1:500)) {
+  tempVar &lt;- harassYN %&gt;%
+ slice_sample(n = 1373, replace = TRUE) %&gt;%
+  count(harass5) %&gt;%
+  mutate(n = n/sum(n)) %&gt;%
+  slice_tail()
+
+  harass_boot_list &lt;- c(harass_boot_list, tempVar$n)
+}
+
+t.test(harass_boot_list)$conf.int</code></pre>
+<ul>
+<li><em>The 95% confidence interval for this bootstrap data is between
+0.1716 and 0.1734. This means that, with 95% certainty, between 17.16%
+and 17.34% of Americans have been harassed at work by their superiors or
+co-workers.</em></li>
+<li><em>A 90% confidence interval would be a slightly smaller interval,
+but would therefore be slightly less likely (to be precise, 5% less
+likely) to include the actual value.</em></li>
+</ul>
 <p>🧶 ✅ ⬆️ Knit, <em>commit, and push your changes to GitHub with an
 appropriate commit message. Make sure to commit and push all changed
 files so that your Git pane is cleared up afterwards and review the md
