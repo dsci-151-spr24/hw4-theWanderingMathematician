@@ -423,6 +423,10 @@ re-order the levels in the following order: <code>&quot;Agree&quot;</code> and
 <code>&quot;Not agree&quot;</code>. Finally, <code>count()</code> how many times
 each new level appears in the <code>advfront</code> variable.</li>
 </ol>
+<pre class="r"><code>gss16 &lt;- gss16 %&gt;%
+  mutate(advfront = fct_recode(advfront, &quot;agree&quot; = &quot;Strongly agree&quot;, &quot;agree&quot; = &quot;Agree&quot;, &quot;Not agree&quot; = &quot;Dont know&quot;, &quot;Not agree&quot; = &quot;Disagree&quot;, &quot;Not agree&quot; = &quot;Strongly disagree&quot;))
+
+count(gss16, advfront)</code></pre>
 <pre class="marginfigure"><code>You can do this in various ways. One option is to use the `str_detect()` function to detect the existence of words like liberal or conservative. Note that these sometimes show up with lowercase first letters and sometimes with upper case first letters. To detect either in the `str_detect()` function, you can use &quot;[Ll]iberal&quot; and &quot;[Cc]onservative&quot;. But feel free to solve the problem however you like, this is just one option!</code></pre>
 <ol start="2" style="list-style-type: decimal">
 <li>Combine the levels of the <code>polviews</code> variable such that
@@ -433,6 +437,13 @@ Then, re-order the levels in the following order:
 <code>&quot;Conservative&quot;</code> , <code>&quot;Moderate&quot;</code>, and
 <code>&quot;Liberal&quot;</code>. Finally, <code>count()</code> how many times
 each new level appears in the <code>polviews</code> variable.</li>
+</ol>
+<pre class="r"><code>gss16 &lt;- gss16 %&gt;%
+  mutate(polviews = factor(polviews, levels = c(&quot;Extremely liberal&quot;, &quot;Liberal&quot;, &quot;Slightly liberal&quot;, &quot;Moderate&quot;, &quot;Slghtly conservative&quot;, &quot;Conservative&quot;, &quot;Extrmly conservative&quot;),
+         labels = c(&quot;Liberal&quot;, &quot;Liberal&quot;, &quot;Liberal&quot;, &quot;Moderate&quot;, &quot;Conservative&quot;, &quot;Conservative&quot;, &quot;Conservative&quot;)))
+
+count(gss16, polviews)</code></pre>
+<ol start="3" style="list-style-type: decimal">
 <li>Create a new data frame called <code>gss16_advfront</code> that
 includes the variables <code>advfront</code>, <code>educ</code>,
 <code>polviews</code>, and <code>wrkstat</code>. Then, use the
@@ -441,7 +452,7 @@ includes the variables <code>advfront</code>, <code>educ</code>,
 below.</li>
 </ol>
 <pre class="r"><code>gss16_advfront &lt;- gss16 %&gt;%
-  select(___, ___, ___, ___) %&gt;%
+  select(advfront, educ, polviews, wrkstat) %&gt;%
   drop_na()</code></pre>
 <ol start="4" style="list-style-type: decimal">
 <li>Split the data into training (75%) and testing (25%) data sets. Make
@@ -451,8 +462,8 @@ the training data <code>gss16_train</code> and the testing data
 specific names to make it easier to follow the rest of the
 instructions.</li>
 </ol>
-<pre class="r"><code>set.seed(___)
-gss16_split &lt;- initial_split(gss16_advfront)
+<pre class="r"><code>set.seed(15042024)
+gss16_split &lt;- initial_split(gss16_advfront, prop = 0.75)
 gss16_train &lt;- training(gss16_split)
 gss16_test  &lt;- testing(gss16_split)</code></pre>
 <ol start="5" style="list-style-type: decimal">
@@ -470,16 +481,16 @@ variable into <code>&quot;Other&quot;</code>.</p></li>
 i.e. <code>all_predictors()</code></p></li>
 </ul></li>
 </ol>
-<pre class="r"><code>gss16_rec_1 &lt;- recipe(___ ~ ___, data = ___) %&gt;%
-  step_other(wrkstat, threshold = ___, other = &quot;Other&quot;) %&gt;%
+<pre class="r"><code>gss16_rec_1 &lt;- recipe(advfront ~ polviews + wrkstat + educ, data = gss16_train) %&gt;%
+  step_other(wrkstat, threshold = 0.1, other = &quot;Other&quot;) %&gt;%
   step_dummy(all_nominal(), -all_outcomes())</code></pre>
 <ol start="6" style="list-style-type: decimal">
 <li>Specify a logistic regression model using <code>&quot;glm&quot;</code> as the
 engine. Name this specification <code>gss16_spec</code>. Sample code is
 provided below.</li>
 </ol>
-<pre class="r"><code>gss16_spec &lt;- ___() %&gt;%
-  set_engine(&quot;___&quot;)</code></pre>
+<pre class="r"><code>gss16_spec &lt;- logistic_reg() %&gt;%
+  set_engine(&quot;glm&quot;)</code></pre>
 <ol start="7" style="list-style-type: decimal">
 <li>Build a workflow that uses the recipe you defined
 (<code>gss16_rec</code>) and the model you specified
@@ -487,8 +498,8 @@ provided below.</li>
 <code>gss16_wflow_1</code>. Sample code is provided below.</li>
 </ol>
 <pre class="r"><code>gss16_wflow_1 &lt;- workflow() %&gt;%
-  add_model(___) %&gt;%
-  add_recipe(___)</code></pre>
+  add_model(gss16_spec) %&gt;%
+  add_recipe(gss16_rec_1)</code></pre>
 <ol start="8" style="list-style-type: decimal">
 <li><p>Perform 5-fold cross validation. specifically,</p>
 <ul>
@@ -504,14 +515,24 @@ accuracy for each fold by setting <code>summarize = FALSE</code> in
 all cross validation folds <code>collect_metrics()</code></p></li>
 </ul></li>
 </ol>
-<pre class="r"><code>set.seed(___)
-gss16_folds &lt;- vfold_cv(___, v = ___)
+<pre class="r"><code>set.seed(1381504)
+gss16_folds &lt;- vfold_cv(gss16_train, v = 5)
 
 gss16_fit_rs_1 &lt;- gss16_wflow_1 %&gt;%
-  fit_resamples(___)
+  fit_resamples(gss16_folds)
 
-collect_metrics(___, summarize = FALSE)
-collect_metrics(___)</code></pre>
+collect_metrics(gss16_fit_rs_1, summarize = FALSE) %&gt;%
+  pivot_wider(names_from = .metric, values_from = .estimate)
+collect_metrics(gss16_fit_rs_1)</code></pre>
+<ul>
+<li><em>between folds, accuracy varies, between the values of 0.82 to
+0.87, and the brier score varies between 0.10 and 0.15. The area under
+the ROC curve varies much more, with a range from 0.54 to 0.75. Accuracy
+and Brier score are thus more consistent across the data than the area
+under the ROC curve.</em></li>
+<li><em>The average area under the ROC curve across all folds is 0.64,
+while the average accuracy is 0.84.</em></li>
+</ul>
 <ol start="9" style="list-style-type: decimal">
 <li><p>Now, try a different, simpler model: predict
 <code>advfront</code> from only <code>polviews</code> and
@@ -525,23 +546,100 @@ workflow <code>gss16_wflow_2</code>),</li>
 <li>report the average area under the ROC curve and the accuracy for all
 cross validation folds <code>collect_metrics()</code>.</li>
 </ul></li>
-<li><p>Comment on which model performs better (one including
+</ol>
+<pre class="r"><code>gss16_rec_2 &lt;- recipe(advfront ~ polviews + educ, data = gss16_train) %&gt;%
+  step_dummy(all_nominal(), -all_outcomes())
+
+gss16_wflow_2 &lt;- workflow() %&gt;%
+  add_model(gss16_spec) %&gt;%
+  add_recipe(gss16_rec_2)
+
+gss16_fit_rs_2 &lt;- gss16_wflow_2 %&gt;%
+  fit_resamples(gss16_folds)
+
+collect_metrics(gss16_fit_rs_2, summarize = FALSE) %&gt;%
+  pivot_wider(names_from = .metric, values_from = .estimate)
+collect_metrics(gss16_fit_rs_2)</code></pre>
+<ul>
+<li><em>The accuracies of this model also varies from 0.82 to 0.87, and
+the brier score varies between 0.10 and 0.15, each only slightly off
+from the initial values. The area under the ROC curve has a slightly
+broader range, from 0.54 to 0.77 instead of only to 0.75 in the initial
+model.</em></li>
+<li><em>The average area under the ROC curve across all folds is
+slightly higher, at 0.65, while the average accuracy is still
+0.84.</em></li>
+</ul>
+<ol start="10" style="list-style-type: decimal">
+<li>Comment on which model performs better (one including
 <code>wrkstat</code>, model 1, or the one excluding
 <code>wrkstat</code>, model 2) on the training data based on area under
-the ROC curve.</p></li>
-<li><p>Fit both models to the testing data, plot the ROC curves for the
+the ROC curve.</li>
+</ol>
+<ul>
+<li><em>The models perform roughly evenly, with the outcome being
+slightly in favor of the model that does </em>not <em>include
+<code>wrkstat</code>.</em></li>
+</ul>
+<ol start="11" style="list-style-type: decimal">
+<li>Fit both models to the testing data, plot the ROC curves for the
 predictions for both models, and calculate the areas under the ROC
 curve. Does your answer to the previous exercise hold for the testing
 data as well? Explain your reasoning. Note: If you haven’t yet done so,
 you’ll need to first train your workflows on the training data with the
 following, and then use these fit objects to calculate predictions for
-the test data.</p></li>
+the test data.</li>
 </ol>
 <pre class="r"><code>gss16_fit_1 &lt;- gss16_wflow_1 %&gt;%
   fit(gss16_train)
 
 gss16_fit_2 &lt;- gss16_wflow_2 %&gt;%
-  fit(gss16_train)</code></pre>
+  fit(gss16_train)
+
+gss16_test_1 &lt;- gss16_fit_1 %&gt;%
+  predict(gss16_test, type = &quot;prob&quot;) %&gt;%
+  bind_cols(gss16_test %&gt;% select(wrkstat, educ, polviews, advfront))
+
+gss16_test_2 &lt;- gss16_fit_2 %&gt;%
+  predict(gss16_test, type = &quot;prob&quot;) %&gt;%
+  bind_cols(gss16_test %&gt;% select(wrkstat, educ, polviews, advfront))
+
+roc_curve(gss16_test_1,
+  truth = advfront,
+  .pred_agree,
+  event_level = &quot;second&quot;
+  ) %&gt;%
+  autoplot()
+
+roc_auc(gss16_test_1,
+  truth = advfront,
+  .pred_agree,
+  event_level = &quot;second&quot;
+  )
+
+roc_curve(gss16_test_2,
+  truth = advfront,
+  .pred_agree,
+  event_level = &quot;second&quot;
+  ) %&gt;%
+  autoplot()
+
+roc_auc(gss16_test_2,
+  truth = advfront,
+  .pred_agree,
+  event_level = &quot;second&quot;
+  )</code></pre>
+<ul>
+<li><em>When used to predict the testing data, both models perform
+considerably worse than on the training data, suggesting that the model
+may have been overfitting points on the training data instead of fitting
+the general distribution of the data. Also, in this, to our surprise, we
+see that the model with <code>wrkstat</code> included does better than
+the model without it. Presumably, the <code>wrkstat</code> variable does
+better at making the prediction more general and less specific, hence
+the lower value in the training data and the higher value in the testing
+data.</em></li>
+</ul>
 <p>🧶 ✅ ⬆️ Knit, <em>commit, and push your changes to GitHub with an
 appropriate commit message. Make sure to commit and push all changed
 files so that your Git pane is cleared up afterwards.</em></p>

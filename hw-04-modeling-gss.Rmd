@@ -69,24 +69,41 @@ It's important that you don't recode the NAs, just the remaining levels.
 
 1.  Re-level the `advfront` variable such that it has two levels: `Strongly agree` and "`Agree"` combined into a new level called `agree` and the remaining levels (except `NA`s) combined into "`Not agree"`. Then, re-order the levels in the following order: `"Agree"` and `"Not agree"`. Finally, `count()` how many times each new level appears in the `advfront` variable.
 
+```{r adv-releveling}
+
+gss16 <- gss16 %>%
+  mutate(advfront = fct_recode(advfront, "agree" = "Strongly agree", "agree" = "Agree", "Not agree" = "Dont know", "Not agree" = "Disagree", "Not agree" = "Strongly disagree"))
+
+count(gss16, advfront)
+```
+
 ```{marginfigure}
 You can do this in various ways. One option is to use the `str_detect()` function to detect the existence of words like liberal or conservative. Note that these sometimes show up with lowercase first letters and sometimes with upper case first letters. To detect either in the `str_detect()` function, you can use "[Ll]iberal" and "[Cc]onservative". But feel free to solve the problem however you like, this is just one option!
 ```
 
 2.  Combine the levels of the `polviews` variable such that levels that have the word "liberal" in them are lumped into a level called `"Liberal"` and those that have the word conservative in them are lumped into a level called `"Conservative"`. Then, re-order the levels in the following order: `"Conservative"` , `"Moderate"`, and `"Liberal"`. Finally, `count()` how many times each new level appears in the `polviews` variable.
+
+```{r polviews-releveling}
+gss16 <- gss16 %>%
+  mutate(polviews = factor(polviews, levels = c("Extremely liberal", "Liberal", "Slightly liberal", "Moderate", "Slghtly conservative", "Conservative", "Extrmly conservative"),
+         labels = c("Liberal", "Liberal", "Liberal", "Moderate", "Conservative", "Conservative", "Conservative")))
+
+count(gss16, polviews)
+```
+
 3.  Create a new data frame called `gss16_advfront` that includes the variables `advfront`, `educ`, `polviews`, and `wrkstat`. Then, use the `drop_na()` function to remove rows that contain `NA`s from this new data frame. Sample code is provided below.
 
-```{r eval=FALSE}
+```{r select-gss-columns}
 gss16_advfront <- gss16 %>%
-  select(___, ___, ___, ___) %>%
+  select(advfront, educ, polviews, wrkstat) %>%
   drop_na()
 ```
 
 4.  Split the data into training (75%) and testing (25%) data sets. Make sure to set a seed before you do the `initial_split()`. Call the training data `gss16_train` and the testing data `gss16_test`. Sample code is provided below. Use these specific names to make it easier to follow the rest of the instructions.
 
-```{r eval=FALSE}
-set.seed(___)
-gss16_split <- initial_split(gss16_advfront)
+```{r split-data}
+set.seed(15042024)
+gss16_split <- initial_split(gss16_advfront, prop = 0.75)
 gss16_train <- training(gss16_split)
 gss16_test  <- testing(gss16_split)
 ```
@@ -99,25 +116,25 @@ gss16_test  <- testing(gss16_split)
 
     -   `step_dummy()` to create dummy variables for `all_nominal()` variables that are predictors, i.e. `all_predictors()`
 
-```{r eval=FALSE}
-gss16_rec_1 <- recipe(___ ~ ___, data = ___) %>%
-  step_other(wrkstat, threshold = ___, other = "Other") %>%
+```{r recipe-1}
+gss16_rec_1 <- recipe(advfront ~ polviews + wrkstat + educ, data = gss16_train) %>%
+  step_other(wrkstat, threshold = 0.1, other = "Other") %>%
   step_dummy(all_nominal(), -all_outcomes())
 ```
 
 6.  Specify a logistic regression model using `"glm"` as the engine. Name this specification `gss16_spec`. Sample code is provided below.
 
-```{r eval=FALSE}
-gss16_spec <- ___() %>%
-  set_engine("___")
+```{r logistic-regression}
+gss16_spec <- logistic_reg() %>%
+  set_engine("glm")
 ```
 
 7.  Build a workflow that uses the recipe you defined (`gss16_rec`) and the model you specified (`gss16_spec`). Name this workflow `gss16_wflow_1`. Sample code is provided below.
 
-```{r eval=FALSE}
+```{r create-workflow-1}
 gss16_wflow_1 <- workflow() %>%
-  add_model(___) %>%
-  add_recipe(___)
+  add_model(gss16_spec) %>%
+  add_recipe(gss16_rec_1)
 ```
 
 8.  Perform 5-fold cross validation.
@@ -131,16 +148,20 @@ gss16_wflow_1 <- workflow() %>%
 
     -   report the average area under the ROC curve and the accuracy for all cross validation folds `collect_metrics()`
 
-```{r eval=FALSE}
-set.seed(___)
-gss16_folds <- vfold_cv(___, v = ___)
+```{r cross-validation}
+set.seed(1381504)
+gss16_folds <- vfold_cv(gss16_train, v = 5)
 
 gss16_fit_rs_1 <- gss16_wflow_1 %>%
-  fit_resamples(___)
+  fit_resamples(gss16_folds)
 
-collect_metrics(___, summarize = FALSE)
-collect_metrics(___)
+collect_metrics(gss16_fit_rs_1, summarize = FALSE) %>%
+  pivot_wider(names_from = .metric, values_from = .estimate)
+collect_metrics(gss16_fit_rs_1)
 ```
+
+- *between folds, accuracy varies, between the values of 0.82 to 0.87, and the brier score varies between 0.10 and 0.15. The area under the ROC curve varies much more, with a range from 0.54 to 0.75. Accuracy and Brier score are thus more consistent across the data than the area under the ROC curve.*
+- *The average area under the ROC curve across all folds is 0.64, while the average accuracy is 0.84.*
 
 9.  Now, try a different, simpler model: predict `advfront` from only `polviews` and `educ`.
     Specifically,
@@ -149,21 +170,78 @@ collect_metrics(___)
     -   redefine the workflow with the new recipe (and name this new workflow `gss16_wflow_2`),
     -   perform cross validation, and
     -   report the average area under the ROC curve and the accuracy for all cross validation folds `collect_metrics()`.
+    
+```{r workflow-2-w}
+gss16_rec_2 <- recipe(advfront ~ polviews + educ, data = gss16_train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+gss16_wflow_2 <- workflow() %>%
+  add_model(gss16_spec) %>%
+  add_recipe(gss16_rec_2)
+
+gss16_fit_rs_2 <- gss16_wflow_2 %>%
+  fit_resamples(gss16_folds)
+
+collect_metrics(gss16_fit_rs_2, summarize = FALSE) %>%
+  pivot_wider(names_from = .metric, values_from = .estimate)
+collect_metrics(gss16_fit_rs_2)
+```
+- *The accuracies of this model also varies from 0.82 to 0.87, and the brier score varies between 0.10 and 0.15, each only slightly off from the initial values. The area under the ROC curve has a slightly broader range, from 0.54 to 0.77 instead of only to 0.75 in the initial model.*
+- *The average area under the ROC curve across all folds is slightly higher, at 0.65, while the average accuracy is still 0.84.*
 
 10. Comment on which model performs better (one including `wrkstat`, model 1, or the one excluding `wrkstat`, model 2) on the training data based on area under the ROC curve.
+
+- *The models perform roughly evenly, with the outcome being slightly in favor of the model that does *not *include `wrkstat`.*
 
 11. Fit both models to the testing data, plot the ROC curves for the predictions for both models, and calculate the areas under the ROC curve.
     Does your answer to the previous exercise hold for the testing data as well?
     Explain your reasoning.
     Note: If you haven't yet done so, you'll need to first train your workflows on the training data with the following, and then use these fit objects to calculate predictions for the test data.
 
-```{r eval=FALSE}
+```{r compare ROC_curves}
 gss16_fit_1 <- gss16_wflow_1 %>%
   fit(gss16_train)
 
 gss16_fit_2 <- gss16_wflow_2 %>%
   fit(gss16_train)
+
+gss16_test_1 <- gss16_fit_1 %>%
+  predict(gss16_test, type = "prob") %>%
+  bind_cols(gss16_test %>% select(wrkstat, educ, polviews, advfront))
+
+gss16_test_2 <- gss16_fit_2 %>%
+  predict(gss16_test, type = "prob") %>%
+  bind_cols(gss16_test %>% select(wrkstat, educ, polviews, advfront))
+
+roc_curve(gss16_test_1,
+  truth = advfront,
+  .pred_agree,
+  event_level = "second"
+  ) %>%
+  autoplot()
+
+roc_auc(gss16_test_1,
+  truth = advfront,
+  .pred_agree,
+  event_level = "second"
+  )
+
+roc_curve(gss16_test_2,
+  truth = advfront,
+  .pred_agree,
+  event_level = "second"
+  ) %>%
+  autoplot()
+
+roc_auc(gss16_test_2,
+  truth = advfront,
+  .pred_agree,
+  event_level = "second"
+  )
+  
 ```
+
+- *When used to predict the testing data, both models perform considerably worse than on the training data, suggesting that the model may have been overfitting points on the training data instead of fitting the general distribution of the data. Also, in this, to our surprise, we see that the model with `wrkstat` included does better than the model without it. Presumably, the `wrkstat` variable does better at making the prediction more general and less specific, hence the lower value in the training data and the higher value in the testing data.*
 
 🧶 ✅ ⬆️ Knit, *commit, and push your changes to GitHub with an appropriate commit message. Make sure to commit and push all changed files so that your Git pane is cleared up afterwards.*
 
